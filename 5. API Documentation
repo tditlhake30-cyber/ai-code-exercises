@@ -1,0 +1,602 @@
+Exercise: API Documentation
+Overview
+In this exercise, you’ll practice using AI to create comprehensive API documentation that helps other developers understand and use your APIs effectively. You’ll apply different prompt strategies to document endpoints, create examples, and explain authentication and error handling.
+
+Exercise Options
+You have three options for this exercise:
+
+Document your own API: Select an endpoint from an API you’re working on
+
+Document a JavaScript/Express API example: Use the provided Express.js example
+
+Document a Python/Flask API example: Use the provided Flask example
+
+Instructions
+Select the API endpoint you want to document
+
+Apply Prompt 1 to generate comprehensive endpoint documentation
+
+Review the documentation for completeness and accuracy
+
+Apply Prompt 2 to convert the documentation to a different format (e.g., Markdown to OpenAPI)
+
+Apply Prompt 3 to create a developer-friendly usage guide for the endpoint
+
+Compare your documentation with a partner and provide feedback
+
+Note	You do NOT have to actually run the exercise code or create a runnable project from it. The exercise is only about using extracts from the code to create the documentation.
+Prompt Template Reminders
+Prompt 1: Endpoint Documentation Generation
+Please create comprehensive documentation for this API endpoint:
+
+Endpoint: [HTTP method] [endpoint path]
+
+Implementation code:
+```[language]
+[Paste endpoint implementation code]
+```
+
+Please include:
+1. A clear description of the endpoint's purpose
+2. Request parameters (path, query, body) with types and descriptions
+3. Response format with status codes and examples
+4. Authentication requirements
+5. Potential error responses with codes and messages
+6. At least 2 example requests with their responses
+7. Any rate limiting or special considerations
+Prompt 2: API Reference Conversion
+Please convert this API information into a structured [Swagger/OpenAPI/API Blueprint/Markdown] document:
+
+API details:
+[Paste API information, can be informal description]
+
+I need the documentation to include:
+1. Endpoint definitions with paths and methods
+2. Request parameters and body schemas
+3. Response schemas with status codes
+4. Example requests and responses
+5. Error handling information
+
+Format the output as a complete, valid [Swagger/OpenAPI/etc.] document.
+Prompt 3: API Usage Guide Creation
+Please create a developer guide for using this API endpoint. The guide should explain how to:
+
+1. Authenticate with the API
+2. Properly format requests
+3. Handle and interpret responses
+4. Deal with common errors
+5. Include example code in [language] for making requests
+
+API information:
+[Paste endpoint documentation]
+
+Target audience: [Describe experience level and background of users]
+Tone: [Friendly/formal/technical/etc.]
+JavaScript/Express Example
+Product API Endpoint
+/**
+ * Product API endpoints
+ */
+const productRouter = express.Router();
+
+// Get all products with filtering and pagination
+productRouter.get('/', async (req, res) => {
+  try {
+    const {
+      category,
+      minPrice,
+      maxPrice,
+      sort = 'createdAt',
+      order = 'desc',
+      page = 1,
+      limit = 20,
+      inStock
+    } = req.query;
+
+    // Build filter
+    const filter = {};
+
+    if (category) {
+      filter.category = category;
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+      if (minPrice !== undefined) filter.price.$gte = parseFloat(minPrice);
+      if (maxPrice !== undefined) filter.price.$lte = parseFloat(maxPrice);
+    }
+
+    if (inStock === 'true') {
+      filter.stockQuantity = { $gt: 0 };
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Determine sort order
+    const sortOptions = {};
+    sortOptions[sort] = order === 'asc' ? 1 : -1;
+
+    // Execute query
+    const products = await ProductModel.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalProducts = await ProductModel.countDocuments(filter);
+
+    return res.status(200).json({
+      products,
+      pagination: {
+        total: totalProducts,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(totalProducts / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    return res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to fetch products'
+    });
+  }
+});
+
+// Get product by ID
+productRouter.get('/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const product = await ProductModel.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'Product not found'
+      });
+    }
+
+    return res.status(200).json(product);
+  } catch (error) {
+    console.error('Error fetching product:', error);
+
+    // Check if error is invalid ObjectId format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid ID',
+        message: 'Invalid product ID format'
+      });
+    }
+
+    return res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to fetch product'
+    });
+  }
+});
+
+module.exports = productRouter;
+Python/Flask Example
+User Registration Endpoint
+@app.route('/api/users/register', methods=['POST'])
+def register_user():
+    """Register a new user"""
+    data = request.get_json()
+
+    # Validate required fields
+    required_fields = ['username', 'email', 'password']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({
+                'error': 'Missing required field',
+                'message': f'{field} is required'
+            }), 400
+
+    # Check if username or email already exists
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({
+            'error': 'Username taken',
+            'message': 'Username is already in use'
+        }), 409
+
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({
+            'error': 'Email exists',
+            'message': 'An account with this email already exists'
+        }), 409
+
+    # Validate email format
+    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", data['email']):
+        return jsonify({
+            'error': 'Invalid email',
+            'message': 'Please provide a valid email address'
+        }), 400
+
+    # Validate password strength
+    if len(data['password']) < 8:
+        return jsonify({
+            'error': 'Weak password',
+            'message': 'Password must be at least 8 characters long'
+        }), 400
+
+    # Create new user
+    try:
+        # Hash password
+        password_hash = generate_password_hash(data['password'])
+
+        # Create user object
+        new_user = User(
+            username=data['username'],
+            email=data['email'].lower(),
+            password_hash=password_hash,
+            created_at=datetime.utcnow(),
+            role='user'
+        )
+
+        # Add user to database
+        db.session.add(new_user)
+        db.session.commit()
+
+        # Generate confirmation token
+        confirmation_token = generate_confirmation_token(new_user.id)
+
+        # Send confirmation email
+        try:
+            send_confirmation_email(new_user.email, confirmation_token)
+        except Exception as e:
+            # Log email error but continue
+            app.logger.error(f"Failed to send confirmation email: {str(e)}")
+
+        # Create response without password
+        user_data = {
+            'id': new_user.id,
+            'username': new_user.username,
+            'email': new_user.email,
+            'created_at': new_user.created_at.isoformat(),
+            'role': new_user.role
+        }
+
+        return jsonify({
+            'message': 'User registered successfully',
+            'user': user_data
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error registering user: {str(e)}")
+        return jsonify({
+            'error': 'Server error',
+            'message': 'Failed to register user'
+        }), 500
+Example Documentation Outputs
+To give you an idea of what your documentation might look like, here are examples of different formats:
+
+Markdown Documentation Example
+# List Products API
+
+Get a list of products with flexible filtering, sorting, and pagination.
+
+## Endpoint
+
+`GET /api/products`
+
+## Authentication
+
+No authentication required for this endpoint.
+
+## Query Parameters
+
+| Parameter | Type   | Required | Description                                           |
+|-----------|--------|----------|-------------------------------------------------------|
+| category  | String | No       | Filter products by category                           |
+| minPrice  | Number | No       | Filter products with price greater than or equal to this value |
+| maxPrice  | Number | No       | Filter products with price less than or equal to this value |
+| sort      | String | No       | Field to sort by (default: 'createdAt')              |
+| order     | String | No       | Sort order: 'asc' or 'desc' (default: 'desc')        |
+| page      | Number | No       | Page number for pagination (default: 1)              |
+| limit     | Number | No       | Number of items per page (default: 20)               |
+| inStock   | Boolean| No       | When 'true', only show products with stock > 0       |
+
+## Response
+
+### Success Response
+
+**Code**: 200 OK
+
+**Content Example**:
+
+```json
+{
+"products": [
+{
+"_id": "61fa9bcf5c130b2e6d675432",
+"name": "Wireless Headphones",
+"description": "High-quality wireless headphones with noise cancellation",
+"price": 89.99,
+"category": "electronics",
+"stockQuantity": 45,
+"createdAt": "2023-02-01T15:32:47Z",
+"updatedAt": "2023-03-15T09:21:08Z"
+},
+{
+"_id": "61fa9bcf5c130b2e6d675433",
+"name": "Smartphone Case",
+"description": "Protective case for smartphones",
+"price": 19.99,
+"category": "accessories",
+"stockQuantity": 200,
+"createdAt": "2023-02-02T10:11:33Z",
+"updatedAt": "2023-02-02T10:11:33Z"
+}
+],
+"pagination": {
+"total": 42,
+"page": 1,
+"limit": 20,
+"pages": 3
+}
+}
+```
+
+### Error Response
+
+**Code**: 500 Internal Server Error
+
+**Content Example**:
+```json
+{
+"error": "Server error",
+"message": "Failed to fetch products"
+}
+```
+
+## Examples
+
+### Request: Get all products in the "electronics" category
+
+```
+GET /api/products?category=electronics
+```
+
+### Response
+
+```json
+{
+"products": [
+{
+"_id": "61fa9bcf5c130b2e6d675432",
+"name": "Wireless Headphones",
+"description": "High-quality wireless headphones with noise cancellation",
+"price": 89.99,
+"category": "electronics",
+"stockQuantity": 45,
+"createdAt": "2023-02-01T15:32:47Z",
+"updatedAt": "2023-03-15T09:21:08Z"
+},
+{
+"_id": "61fa9bcf5c130b2e6d675435",
+"name": "Bluetooth Speaker",
+"description": "Portable bluetooth speaker with 20 hour battery life",
+"price": 49.99,
+"category": "electronics",
+"stockQuantity": 32,
+"createdAt": "2023-01-25T14:22:19Z",
+"updatedAt": "2023-03-10T11:05:24Z"
+}
+],
+"pagination": {
+"total": 12,
+"page": 1,
+"limit": 20,
+"pages": 1
+}
+}
+```
+
+### Request: Get products with price between $20 and $100, sorted by price
+
+```
+GET /api/products?minPrice=20&maxPrice=100&sort=price&order=asc&page=1&limit=10
+```
+
+### Response
+
+```json
+{
+"products": [
+{
+"_id": "61fa9bcf5c130b2e6d675439",
+"name": "T-Shirt",
+"description": "Cotton t-shirt with logo",
+"price": 24.99,
+"category": "clothing",
+"stockQuantity": 150,
+"createdAt": "2023-01-15T08:27:13Z",
+"updatedAt": "2023-01-15T08:27:13Z"
+},
+{
+"_id": "61fa9bcf5c130b2e6d675435",
+"name": "Bluetooth Speaker",
+"description": "Portable bluetooth speaker with 20 hour battery life",
+"price": 49.99,
+"category": "electronics",
+"stockQuantity": 32,
+"createdAt": "2023-01-25T14:22:19Z",
+"updatedAt": "2023-03-10T11:05:24Z"
+}
+],
+"pagination": {
+"total": 18,
+"page": 1,
+"limit": 10,
+"pages": 2
+}
+}
+```
+
+## Notes
+
+- The API uses MongoDB for data storage
+- All timestamps are in ISO 8601 format (UTC)
+- Product IDs are MongoDB ObjectId strings
+- The maximum allowed limit per page is 100 items
+OpenAPI/Swagger Example
+openapi: 3.0.0
+info:
+  title: Products API
+  description: API for retrieving product information
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+paths:
+  /api/products:
+    get:
+      summary: List products
+      description: Get a list of products with flexible filtering, sorting, and pagination
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter products by category
+        - in: query
+          name: minPrice
+          schema:
+            type: number
+          description: Filter products with price greater than or equal to this value
+        - in: query
+          name: maxPrice
+          schema:
+            type: number
+          description: Filter products with price less than or equal to this value
+        - in: query
+          name: sort
+          schema:
+            type: string
+            default: createdAt
+          description: Field to sort by
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+        - in: query
+          name: inStock
+          schema:
+            type: boolean
+          description: When true, only show products with stock > 0
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique identifier for the product
+        name:
+          type: string
+          description: Product name
+        description:
+          type: string
+          description: Product description
+        price:
+          type: number
+          format: float
+          description: Product price
+        category:
+          type: string
+          description: Product category
+        stockQuantity:
+          type: integer
+          description: Available quantity in stock
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of items
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Items per page
+        pages:
+          type: integer
+          description: Total number of pages
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Error message
+What to Submit
+At the end of the exercise, you should have:
+
+The original API endpoint code you chose to document
+
+The comprehensive endpoint documentation you generated using Prompt 1
+
+The converted documentation format you created using Prompt 2
+
+The developer usage guide you created using Prompt 3
+
+Be prepared to share what you learned about:
+
+Which parts of the API were most challenging to document
+
+How you adjusted your prompts to get better results
+
+Which documentation format you found most effective for your API
+
+How you would incorporate this approach into your development workflow
